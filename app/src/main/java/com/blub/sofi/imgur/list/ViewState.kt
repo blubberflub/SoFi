@@ -5,13 +5,15 @@ import com.blub.sofi.data.imgur.model.ImageResource
 
 data class ViewState(
     val imageList: List<ImageResource>,
-    val progressShowing: Boolean,
+    val detailsShown: Boolean,
+    val progressShown: Boolean,
     val errorShown: Boolean
 ) : BaseViewState() {
     companion object {
         fun idle(): ViewState = ViewState(
             imageList = emptyList(),
-            progressShowing = false,
+            detailsShown = false,
+            progressShown = false,
             errorShown = false
         )
     }

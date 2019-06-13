@@ -2,8 +2,6 @@ package com.blub.sofi.imgur.list
 
 import com.blub.sofi.base.BaseViewModel
 import com.blub.sofi.data.imgur.ImgurRepository
-import com.blub.sofi.data.imgur.model.ImageResource
-import com.blub.sofi.utils.Beaver
 import io.reactivex.Observable
 import io.reactivex.Scheduler
 import io.reactivex.functions.BiFunction
@@ -42,11 +40,11 @@ class ImageListViewModel
             val newState: ViewState = when (result) {
                 is GetListSuccess -> prevState.copy(
                     imageList = result.imageList.toList(),
-                    progressShowing = false
+                    progressShown = false
                 )
                 Error -> prevState.copy(errorShown = true)
                 Idle -> prevState.copy(errorShown = false)
-                InFlight -> prevState.copy(progressShowing = true)
+                InFlight -> prevState.copy(progressShown = true)
             }
 
             newState

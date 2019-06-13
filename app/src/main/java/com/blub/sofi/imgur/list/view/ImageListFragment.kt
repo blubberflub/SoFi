@@ -6,43 +6,47 @@ import android.view.*
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.widget.SearchView
-import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.CircularProgressDrawable
-import com.blub.sofi.App
 import com.blub.sofi.R
 import com.blub.sofi.ViewModelFactory
+import com.blub.sofi.base.BaseFragment
+import com.blub.sofi.base.BaseViewModel
+import com.blub.sofi.dagger.AppComponent
 import com.blub.sofi.data.imgur.model.ImageResource
 import com.blub.sofi.extensions.showToast
 import com.blub.sofi.imgur.details.ImageDetailsActivity
-import com.blub.sofi.imgur.list.ImageListViewModel
-import com.blub.sofi.imgur.list.SearchQueryChangedEvent
-import com.blub.sofi.imgur.list.ViewState
+import com.blub.sofi.imgur.list.*
 import com.blub.sofi.utils.GlideApp
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.jakewharton.rxbinding2.support.v7.widget.RxSearchView
-import io.reactivex.disposables.CompositeDisposable
 import kotlinx.android.synthetic.main.imgur_list_fragment.*
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 
-class ImageListFragment : Fragment(R.layout.imgur_list_fragment) {
+class ImageListFragment : BaseFragment<Event, Result, ViewState>(R.layout.imgur_list_fragment) {
     @Inject
     lateinit var viewModelFactory: ViewModelFactory
     private val viewModel by viewModels<ImageListViewModel> { viewModelFactory }
     private val events get() = viewModel.subject
     private lateinit var imageListAdapter: ImgurAdapter
-    private val disposables = CompositeDisposable()
 
-    private fun render(viewState: ViewState) {
+    override fun getViewModel(): BaseViewModel<Event, Result, ViewState> = viewModel
+
+    override fun inject(component: AppComponent) {
+        component.inject(this)
+    }
+
+    override fun render(viewState: ViewState) {
         imageListAdapter.submitList(viewState.imageList)
 
         if (viewState.errorShown) {
-            showToast("An error has occurred!")
+            showToast(R.string.error)
         }
     }
 
@@ -59,7 +63,7 @@ class ImageListFragment : Fragment(R.layout.imgur_list_fragment) {
             .skipInitialValue()
             .debounce(250, TimeUnit.MILLISECONDS)
             .subscribe {
-                events.onNext(SearchQueryChangedEvent(it.toString()))
+                sendEvent(SearchQueryChangedEvent(it.toString()))
             })
     }
 
@@ -67,40 +71,25 @@ class ImageListFragment : Fragment(R.layout.imgur_list_fragment) {
         super.onCreate(savedInstanceState)
 
         setHasOptionsMenu(true)
-        retainInstance = true
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        App.component.inject(this)
-
         val context = requireContext()
-        imageListAdapter = ImgurAdapter(context) { imageResourceId ->
-            ImageDetailsActivity.startInstance(context, imageResourceId)
+        imageListAdapter = ImgurAdapter(context) { imageResourceId, isAlbum ->
+            ImageDetailsActivity.startInstance(context, imageResourceId, isAlbum)
         }
 
         with(imgur_list) {
             adapter = imageListAdapter
             layoutManager = LinearLayoutManager(context)
         }
-
-        disposables.add(
-            viewModel
-                .eventStream()
-                .subscribe(::render)
-        )
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-
-        disposables.clear()
     }
 
     class ImgurAdapter(
         val context: Context,
-        val itemClickListener: (String) -> Unit
+        val itemClickListener: (String, Boolean) -> Unit
     ) : ListAdapter<ImageResource, ImgurAdapter.ImageViewHolder>(DiffCallback()) {
         companion object {
             private const val IMAGE_VIEW_TYPE = 1
@@ -127,29 +116,62 @@ class ImageListFragment : Fragment(R.layout.imgur_list_fragment) {
         }
 
         override fun onBindViewHolder(holder: ImageViewHolder, position: Int) {
-            val data = getItem(position)
+            val imageResource = getItem(position)
+            val type = getItemViewType(position)
 
-            val coverImageId = data.cover
-            val coverImage = if (data.isAlbum) {
-                data.images.find {
-                    it.id == coverImageId
-                }!!.link
-            } else {
-                data.link
+            when (type) {
+                ALBUM_VIEW_TYPE -> onBindAlbum(holder, imageResource)
+                IMAGE_VIEW_TYPE -> onBindImage(holder, imageResource)
             }
+        }
 
+        private fun onBindImage(
+            holder: ImageViewHolder,
+            imageResource: ImageResource
+        ) {
             with(holder) {
+                isAlbum.visibility = View.INVISIBLE
+
                 GlideApp
                     .with(context)
-                    .load(coverImage)
+                    .load(imageResource.link)
+                    .override(albumCover.width, albumCover.height)
                     .placeholder(progressDrawable())
                     .centerCrop()
                     .error(R.color.colorPrimary)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .into(albumCover)
-                title.text = data.title
+                title.text = imageResource.title
 
                 parent.setOnClickListener {
-                    itemClickListener(data.id)
+                    itemClickListener(imageResource.id, imageResource.isAlbum)
+                }
+            }
+        }
+
+        private fun onBindAlbum(
+            holder: ImageViewHolder,
+            imageResource: ImageResource
+        ) {
+            val coverId = imageResource.cover
+            val coverImage = imageResource.images.find { it.id == coverId }
+
+            with(holder) {
+                isAlbum.visibility = View.VISIBLE
+
+                GlideApp
+                    .with(context)
+                    .load(coverImage!!.link)
+                    .override(albumCover.width, albumCover.height)
+                    .placeholder(progressDrawable())
+                    .centerCrop()
+                    .error(R.color.colorPrimary)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .into(albumCover)
+                title.text = imageResource.title
+
+                parent.setOnClickListener {
+                    itemClickListener(imageResource.id, imageResource.isAlbum)
                 }
             }
         }
@@ -157,6 +179,7 @@ class ImageListFragment : Fragment(R.layout.imgur_list_fragment) {
         class ImageViewHolder(val parent: View) : RecyclerView.ViewHolder(parent) {
             val albumCover: ImageView = parent.findViewById(R.id.image)
             val title: TextView = parent.findViewById(R.id.title)
+            val isAlbum: ImageView = parent.findViewById(R.id.is_album)
         }
 
         fun progressDrawable(): CircularProgressDrawable {

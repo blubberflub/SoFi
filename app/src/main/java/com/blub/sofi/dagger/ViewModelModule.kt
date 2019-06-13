@@ -3,6 +3,7 @@ package com.blub.sofi.dagger
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.blub.sofi.ViewModelFactory
+import com.blub.sofi.imgur.details.ImageDetailsViewModel
 import com.blub.sofi.imgur.list.ImageListViewModel
 import dagger.Binds
 import dagger.MapKey
@@ -18,7 +19,12 @@ abstract class ViewModelModule {
     @Binds
     @IntoMap
     @ViewModelKey(ImageListViewModel::class)
-    internal abstract fun imgurListViewModel(viewModel: ImageListViewModel): ViewModel
+    internal abstract fun imageListViewModel(viewModel: ImageListViewModel): ViewModel
+
+    @Binds
+    @IntoMap
+    @ViewModelKey(ImageDetailsViewModel::class)
+    internal abstract fun imageDetailsViewModel(viewModel: ImageDetailsViewModel): ViewModel
 }
 
 @Target(AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY_GETTER, AnnotationTarget.PROPERTY_SETTER)

@@ -1,12 +1,17 @@
 package com.blub.sofi.imgur.details
 
 import com.blub.sofi.base.BaseViewState
-import com.blub.sofi.data.imgur.model.Image
 
-data class ViewState(val image: Image?) : BaseViewState() {
+data class ViewState(
+    val imageLink: String,
+    val progressShowing: Boolean,
+    val errorShown: Boolean
+) : BaseViewState() {
     companion object {
-        fun idle(): ViewState {
-            return ViewState(image = null)
-        }
+        fun idle(): ViewState = ViewState(
+            imageLink = "",
+            progressShowing = false,
+            errorShown = false
+        )
     }
 }

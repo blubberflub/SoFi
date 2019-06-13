@@ -1,6 +1,5 @@
 package com.blub.sofi.imgur.details
 
-import androidx.lifecycle.Transformations.map
 import com.blub.sofi.base.BaseViewModel
 import com.blub.sofi.data.imgur.ImgurRepository
 import io.reactivex.Observable
@@ -38,7 +37,10 @@ class ImageDetailsViewModel
     override fun reduce(): BiFunction<ViewState, Result, ViewState> {
         val biFunction = BiFunction { prevState: ViewState, result: Result ->
             when (result) {
-                is GetImageSuccess -> prevState.copy(image = result.link)
+                is GetImageSuccess -> prevState.copy(imageLink = result.link)
+                Error -> prevState.copy(errorShown = true)
+                Idle -> prevState.copy(errorShown = false)
+                InFlight -> prevState.copy(progressShowing = true)
             }
         }
 
